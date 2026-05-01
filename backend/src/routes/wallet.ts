@@ -12,7 +12,7 @@ router.use(requireAuth);
  * GET /api/wallet
  * Get user's wallet information
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
 
@@ -52,7 +52,7 @@ router.get('/', async (req: Request, res: Response) => {
  * POST /api/wallet/deposit
  * Mock deposit to wallet
  */
-router.post('/deposit', async (req: Request, res: Response) => {
+router.post('/deposit', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const { amount, description } = req.body;
@@ -60,10 +60,11 @@ router.post('/deposit', async (req: Request, res: Response) => {
     // Validate amount
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: 'Amount must be a positive number',
       });
+      return;
     }
 
     let wallet = await Wallet.findOne({ userId });
@@ -115,7 +116,7 @@ router.post('/deposit', async (req: Request, res: Response) => {
  * POST /api/wallet/withdraw
  * Mock withdrawal from wallet
  */
-router.post('/withdraw', async (req: Request, res: Response) => {
+router.post('/withdraw', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const { amount, description } = req.body;
@@ -123,10 +124,11 @@ router.post('/withdraw', async (req: Request, res: Response) => {
     // Validate amount
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: 'Amount must be a positive number',
       });
+      return;
     }
 
     let wallet = await Wallet.findOne({ userId });
@@ -144,10 +146,11 @@ router.post('/withdraw', async (req: Request, res: Response) => {
 
     // Check sufficient balance
     if (wallet.balance < parsedAmount) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Insufficient Funds',
         message: 'Insufficient balance for withdrawal',
       });
+      return;
     }
 
     // Add transaction

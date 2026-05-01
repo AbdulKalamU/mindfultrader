@@ -20,14 +20,15 @@ declare global {
  * Validates session and attaches user data to request
  * Returns 401 if session is invalid or missing
  */
-export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
+export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Check if session exists
     if (!req.session || !req.session.userId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Authentication Error',
         message: 'Authentication required. Please log in.',
       });
+      return;
     }
 
     // Validate session and get user
@@ -41,10 +42,11 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         }
       });
 
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Authentication Error',
         message: 'Session expired. Please log in again.',
       });
+      return;
     }
 
     // Attach user data to request
@@ -54,7 +56,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     next();
   } catch (error) {
     logger.error('Authentication middleware error:', error);
-    return res.status(500).json({
+    res.status(500).json({
       error: 'Internal Server Error',
       message: 'An error occurred during authentication.',
     });

@@ -12,17 +12,18 @@ router.use(requireAuth);
  * GET /api/user/profile
  * Get user profile information
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
 
     const user = await User.findById(userId);
 
     if (!user) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Not Found',
         message: 'User not found',
       });
+      return;
     }
 
     res.status(200).json({
@@ -49,31 +50,34 @@ router.get('/', async (req: Request, res: Response) => {
  * PUT /api/user/profile
  * Update user profile information
  */
-router.put('/', async (req: Request, res: Response) => {
+router.put('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
     const { username, tradingStyle, experienceLevel, riskLevel } = req.body;
 
     // Validate enums if provided
     if (tradingStyle && !Object.values(TradingStyle).includes(tradingStyle)) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: 'Invalid trading style',
       });
+      return;
     }
 
     if (experienceLevel && !Object.values(ExperienceLevel).includes(experienceLevel)) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: 'Invalid experience level',
       });
+      return;
     }
 
     if (riskLevel && !Object.values(RiskLevel).includes(riskLevel)) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: 'Invalid risk level',
       });
+      return;
     }
 
     // Build update object (only include provided fields)
@@ -90,10 +94,11 @@ router.put('/', async (req: Request, res: Response) => {
     );
 
     if (!user) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Not Found',
         message: 'User not found',
       });
+      return;
     }
 
     logger.info('Profile updated successfully', { userId });
@@ -112,10 +117,11 @@ router.put('/', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes('validation')) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: error.message,
       });
+      return;
     }
 
     logger.error('Update profile endpoint error:', error);

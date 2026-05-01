@@ -13,7 +13,7 @@ router.use(requireAuth);
  * GET /api/insights
  * Get AI-generated insights for the authenticated user
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
 
@@ -24,24 +24,26 @@ router.get('/', async (req: Request, res: Response) => {
     const hasMinimumData = insightsEngine.shouldGenerateInsights(tradeCount);
 
     if (!hasMinimumData) {
-      return res.status(200).json({
+      res.status(200).json({
         insights: [],
         tradeCount,
         hasMinimumData: false,
         message: 'You need at least 10 trades to generate insights',
       });
+      return;
     }
 
     // Generate or retrieve insights
     const insight = await insightsEngine.generateInsights(userId);
 
     if (!insight) {
-      return res.status(200).json({
+      res.status(200).json({
         insights: [],
         tradeCount,
         hasMinimumData: false,
         message: 'Unable to generate insights at this time',
       });
+      return;
     }
 
     res.status(200).json({

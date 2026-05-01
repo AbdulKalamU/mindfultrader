@@ -8,13 +8,13 @@ const router = Router();
  * POST /api/auth/signup
  * Register a new user account
  */
-router.post('/signup', async (req: Request, res: Response) => {
+router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
     // Validate required fields
     if (!email || !password) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: 'Email and password are required',
         fields: {
@@ -22,6 +22,7 @@ router.post('/signup', async (req: Request, res: Response) => {
           password: !password ? 'Password is required' : undefined,
         },
       });
+      return;
     }
 
     // Create user
@@ -41,16 +42,18 @@ router.post('/signup', async (req: Request, res: Response) => {
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('Email already registered')) {
-        return res.status(409).json({
+        res.status(409).json({
           error: 'Conflict',
           message: error.message,
         });
+        return;
       }
       if (error.message.includes('Invalid email') || error.message.includes('Password must')) {
-        return res.status(400).json({
+        res.status(400).json({
           error: 'Validation Error',
           message: error.message,
         });
+        return;
       }
     }
 
@@ -66,16 +69,17 @@ router.post('/signup', async (req: Request, res: Response) => {
  * POST /api/auth/login
  * Authenticate user and create session
  */
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
     // Validate required fields
     if (!email || !password) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: 'Email and password are required',
       });
+      return;
     }
 
     // Authenticate user
@@ -94,10 +98,11 @@ router.post('/login', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes('Invalid credentials')) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Authentication Error',
         message: 'Invalid email or password',
       });
+      return;
     }
 
     logger.error('Login endpoint error:', error);
@@ -112,7 +117,7 @@ router.post('/login', async (req: Request, res: Response) => {
  * POST /api/auth/logout
  * Terminate user session
  */
-router.post('/logout', async (req: Request, res: Response) => {
+router.post('/logout', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.session.userId;
 
@@ -120,10 +125,11 @@ router.post('/logout', async (req: Request, res: Response) => {
     req.session.destroy((err) => {
       if (err) {
         logger.error('Error destroying session:', err);
-        return res.status(500).json({
+        res.status(500).json({
           error: 'Internal Server Error',
           message: 'An error occurred during logout.',
         });
+        return;
       }
 
       // Call logout service for any cleanup

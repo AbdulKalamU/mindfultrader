@@ -1,20 +1,12 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 
 /**
  * Session interface representing the Session document structure
  * Used by express-session with connect-mongo for session storage
  */
-export interface ISession extends Document {
+export interface ISession {
   _id: string; // Session ID (used as cookie value)
-  session: {
-    cookie: {
-      originalMaxAge: number;
-      expires: Date;
-      httpOnly: boolean;
-      secure: boolean;
-    };
-    userId?: mongoose.Types.ObjectId;
-  };
+  session: any; // Session data (managed by express-session)
   expires: Date;
 }
 

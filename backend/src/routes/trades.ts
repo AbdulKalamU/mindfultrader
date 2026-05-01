@@ -14,7 +14,7 @@ router.use(requireAuth);
  * POST /api/trades
  * Create a new trade
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const { asset, entryPrice, exitPrice, tradeType, mood, notes } = req.body;
     const userId = req.userId!;
@@ -24,17 +24,19 @@ router.post('/', async (req: Request, res: Response) => {
     const parsedExitPrice = parseFloat(exitPrice);
 
     if (isNaN(parsedEntryPrice) || !isFinite(parsedEntryPrice)) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: 'Entry price must be a valid number',
       });
+      return;
     }
 
     if (isNaN(parsedExitPrice) || !isFinite(parsedExitPrice)) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: 'Exit price must be a valid number',
       });
+      return;
     }
 
     // Create trade
@@ -68,10 +70,11 @@ router.post('/', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes('Validation failed')) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Validation Error',
         message: error.message,
       });
+      return;
     }
 
     logger.error('Create trade endpoint error:', error);
