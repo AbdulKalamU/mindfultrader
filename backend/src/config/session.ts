@@ -33,6 +33,8 @@ export const getSessionConfig = (): session.SessionOptions => {
 };
 
 // Extend session data interface
+import mongoose from 'mongoose';
+
 declare module 'express-session' {
   interface SessionData {
     userId: mongoose.Types.ObjectId;
