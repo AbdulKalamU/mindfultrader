@@ -77,7 +77,7 @@ const insightSchema = new Schema<IInsight>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: [true, 'User ID is required'],
-      index: true, // Index for fast user-specific queries
+      // Index removed - using compound index below instead
     },
     text: {
       type: String,

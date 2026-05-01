@@ -49,7 +49,7 @@ const tradeSchema = new Schema<ITrade>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: [true, 'User ID is required'],
-      index: true, // Index for fast user-specific queries
+      // Index removed - using compound indexes below instead
     },
     asset: {
       type: String,

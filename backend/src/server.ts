@@ -1,8 +1,15 @@
+// Load environment variables FIRST before any other imports
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Configure dotenv to look in the correct location
+// When running from dist/, go up one level to find .env
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import session from 'express-session';
-import dotenv from 'dotenv';
 import { database } from './config/database';
 import { getSessionConfig } from './config/session';
 import { logger } from './utils/logger';
@@ -14,9 +21,6 @@ import tradeRoutes from './routes/trades';
 import insightsRoutes from './routes/insights';
 import profileRoutes from './routes/profile';
 import walletRoutes from './routes/wallet';
-
-// Load environment variables
-dotenv.config();
 
 /**
  * Express application setup

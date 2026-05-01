@@ -74,7 +74,7 @@ const walletSchema = new Schema<IWallet>(
       ref: 'User',
       required: [true, 'User ID is required'],
       unique: true, // One wallet per user
-      index: true,
+      // Index removed - unique constraint creates index automatically
     },
     balance: {
       type: Number,
@@ -98,8 +98,5 @@ const walletSchema = new Schema<IWallet>(
     timestamps: true, // Automatically adds createdAt and updatedAt
   }
 );
-
-// Index for efficient user wallet lookups
-walletSchema.index({ userId: 1 });
 
 export const Wallet = mongoose.model<IWallet>('Wallet', walletSchema);
