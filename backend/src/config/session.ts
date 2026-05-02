@@ -13,6 +13,8 @@ export const getSessionConfig = (): session.SessionOptions => {
     throw new Error('DATABASE_URL environment variable is not defined');
   }
 
+  const sessionExpiry = parseInt(process.env.SESSION_EXPIRY || '604800000', 10);
+
   return {
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
     resave: false,
@@ -20,13 +22,17 @@ export const getSessionConfig = (): session.SessionOptions => {
     store: MongoStore.create({
       mongoUrl: databaseUrl,
       collectionName: 'sessions',
-      ttl: parseInt(process.env.SESSION_EXPIRY || '604800000') / 1000, // Convert ms to seconds
+      ttl: Math.floor(sessionExpiry / 1000), // Convert ms to seconds
+      touchAfter: 24 * 3600, // Lazy session update (once per 24 hours)
+      crypto: {
+        secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
+      },
     }),
     cookie: {
-      maxAge: parseInt(process.env.SESSION_EXPIRY || '604800000'), // 7 days default
+      maxAge: sessionExpiry, // 7 days default
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site in production
     },
     name: 'mindfultrader.sid', // Custom session cookie name
   };

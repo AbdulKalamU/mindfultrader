@@ -9,9 +9,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import session from 'express-session';
 import { database } from './config/database';
-import { getSessionConfig } from './config/session';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
@@ -40,7 +38,7 @@ if (process.env.NODE_ENV === 'production') {
 // Security headers
 app.use(helmet());
 
-// CORS configuration
+// CORS configuration - simplified for Railway
 const allowedOrigins = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
   : ['http://localhost:5173'];
@@ -48,14 +46,16 @@ const allowedOrigins = process.env.FRONTEND_URL
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
+      // Allow requests with no origin (mobile apps, Postman, curl, etc.)
       if (!origin) return callback(null, true);
       
-      if (allowedOrigins.includes(origin)) {
+      // Check if origin is in allowed list
+      if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
         callback(null, true);
       } else {
+        // Log but don't throw error - just deny
         logger.warn(`CORS blocked origin: ${origin}`);
-        callback(new Error('Not allowed by CORS'));
+        callback(null, false);
       }
     },
     credentials: true, // Allow cookies
@@ -80,15 +80,17 @@ const startServer = async () => {
     await database.connect();
     logger.info('Database connection successful');
 
-    // Initialize session middleware AFTER database connection
+    // Import and initialize session AFTER database connection
     logger.info('Initializing session store...');
+    const session = require('express-session');
+    const { getSessionConfig } = require('./config/session');
     app.use(session(getSessionConfig()));
     logger.info('Session store initialized');
 
     /**
      * Routes
      */
-    // Root endpoint
+    // Root endpoint (no database required)
     app.get('/', (_req, res) => {
       res.json({
         name: 'MindfulTrader API',
@@ -98,20 +100,28 @@ const startServer = async () => {
       });
     });
 
-    app.use('/api/auth', authRoutes);
-    app.use('/api/trades', tradeRoutes);
-    app.use('/api/insights', insightsRoutes);
-    app.use('/api/user/profile', profileRoutes);
-    app.use('/api/wallet', walletRoutes);
+    // Simple health check (no database required)
+    app.get('/ping', (_req, res) => {
+      res.send('pong');
+    });
 
-    // Health check endpoint
+    // Detailed health check (with database status)
     app.get('/health', (_req, res) => {
       res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
         database: database.getConnectionStatus() ? 'connected' : 'disconnected',
+        environment: process.env.NODE_ENV || 'development',
+        port: PORT,
       });
     });
+
+    // API routes
+    app.use('/api/auth', authRoutes);
+    app.use('/api/trades', tradeRoutes);
+    app.use('/api/insights', insightsRoutes);
+    app.use('/api/user/profile', profileRoutes);
+    app.use('/api/wallet', walletRoutes);
 
     /**
      * Error handling
@@ -120,31 +130,67 @@ const startServer = async () => {
     app.use(errorHandler);
 
     // Start listening on all interfaces (0.0.0.0) for Railway
-    app.listen(PORT, '0.0.0.0', () => {
-      logger.info(`Server started on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      logger.info(`✅ Server started successfully on port ${PORT}`);
+      logger.info(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`✅ Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+      logger.info(`✅ Server is ready to accept connections`);
     });
+
+    // Handle server errors
+    server.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        logger.error(`Port ${PORT} is already in use`);
+      } else {
+        logger.error('Server error:', error);
+      }
+      process.exit(1);
+    });
+
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
 };
 
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  await database.disconnect();
-  process.exit(0);
+  try {
+    await database.disconnect();
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during shutdown:', error);
+    process.exit(1);
+  }
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
-  await database.disconnect();
-  process.exit(0);
+  try {
+    await database.disconnect();
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during shutdown:', error);
+    process.exit(1);
+  }
 });
 
 // Start the server
-startServer();
+startServer().catch((error) => {
+  logger.error('Fatal error during startup:', error);
+  process.exit(1);
+});
 
 export default app;
