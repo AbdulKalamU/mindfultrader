@@ -13,8 +13,7 @@ import type {
   RiskLevel,
 } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
+const API_URL = 'https://mindfultrader-production.up.railway.app/api';
 /**
  * Axios instance with default configuration
  */
