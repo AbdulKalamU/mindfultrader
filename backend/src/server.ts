@@ -66,6 +66,12 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request logging middleware (before routes)
+app.use((req, _res, next) => {
+  logger.info(`Incoming request: ${req.method} ${req.path} from ${req.ip}`);
+  next();
+});
+
 /**
  * Start server
  */
@@ -74,6 +80,21 @@ const startServer = async () => {
     logger.info('Starting MindfulTrader API server...');
     logger.info(`Node environment: ${process.env.NODE_ENV || 'development'}`);
     logger.info(`Port: ${PORT}`);
+
+    // Add simple health check BEFORE database connection
+    // This ensures Railway can check health even if DB is slow
+    app.get('/ping', (_req, res) => {
+      res.send('pong');
+    });
+
+    app.get('/', (_req, res) => {
+      res.json({
+        name: 'MindfulTrader API',
+        status: 'running',
+        version: '2.0.0',
+        timestamp: new Date().toISOString(),
+      });
+    });
 
     // Connect to database FIRST
     logger.info('Connecting to database...');
@@ -90,21 +111,6 @@ const startServer = async () => {
     /**
      * Routes
      */
-    // Root endpoint (no database required)
-    app.get('/', (_req, res) => {
-      res.json({
-        name: 'MindfulTrader API',
-        status: 'running',
-        version: '2.0.0',
-        timestamp: new Date().toISOString(),
-      });
-    });
-
-    // Simple health check (no database required)
-    app.get('/ping', (_req, res) => {
-      res.send('pong');
-    });
-
     // Detailed health check (with database status)
     app.get('/health', (_req, res) => {
       res.json({
@@ -135,7 +141,12 @@ const startServer = async () => {
       logger.info(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`✅ Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
       logger.info(`✅ Server is ready to accept connections`);
+      logger.info(`✅ Health check available at: http://0.0.0.0:${PORT}/health`);
     });
+
+    // Keep the server alive
+    server.keepAliveTimeout = 65000; // 65 seconds
+    server.headersTimeout = 66000; // 66 seconds
 
     // Handle server errors
     server.on('error', (error: any) => {
@@ -147,6 +158,13 @@ const startServer = async () => {
       process.exit(1);
     });
 
+    // Log when server is closing
+    server.on('close', () => {
+      logger.info('Server is closing...');
+    });
+
+    return server;
+
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
@@ -156,12 +174,18 @@ const startServer = async () => {
 // Handle uncaught errors
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
-  process.exit(1);
+  // Don't exit immediately in production, log and continue
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  // Don't exit immediately in production, log and continue
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
 });
 
 // Handle graceful shutdown
