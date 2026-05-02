@@ -61,6 +61,10 @@ const startServer = async () => {
     /**
      * Routes
      */
+
+    app.get('/', (_req, res) => {
+  res.send('MindfulTrader API running 🚀');
+});
     app.use('/api/auth', authRoutes);
     app.use('/api/trades', tradeRoutes);
     app.use('/api/insights', insightsRoutes);
