@@ -26,7 +26,12 @@ import walletRoutes from './routes/wallet';
  * Express application setup
  */
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
+
+// Trust Railway proxy for secure cookies
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 /**
  * Middleware configuration
@@ -36,9 +41,23 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet());
 
 // CORS configuration
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : ['http://localhost:5173'];
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        logger.warn(`CORS blocked origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true, // Allow cookies
   })
 );
@@ -52,19 +71,33 @@ app.use(express.urlencoded({ extended: true }));
  */
 const startServer = async () => {
   try {
+    logger.info('Starting MindfulTrader API server...');
+    logger.info(`Node environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`Port: ${PORT}`);
+
     // Connect to database FIRST
+    logger.info('Connecting to database...');
     await database.connect();
+    logger.info('Database connection successful');
 
     // Initialize session middleware AFTER database connection
+    logger.info('Initializing session store...');
     app.use(session(getSessionConfig()));
+    logger.info('Session store initialized');
 
     /**
      * Routes
      */
-
+    // Root endpoint
     app.get('/', (_req, res) => {
-  res.send('MindfulTrader API running 🚀');
-});
+      res.json({
+        name: 'MindfulTrader API',
+        status: 'running',
+        version: '2.0.0',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
     app.use('/api/auth', authRoutes);
     app.use('/api/trades', tradeRoutes);
     app.use('/api/insights', insightsRoutes);
@@ -86,8 +119,8 @@ const startServer = async () => {
     app.use(notFoundHandler);
     app.use(errorHandler);
 
-    // Start listening
-    app.listen(PORT, () => {
+    // Start listening on all interfaces (0.0.0.0) for Railway
+    app.listen(PORT, '0.0.0.0', () => {
       logger.info(`Server started on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
