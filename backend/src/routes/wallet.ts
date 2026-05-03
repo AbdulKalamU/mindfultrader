@@ -49,6 +49,105 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
+ * GET /api/wallet/analytics
+ * Get portfolio analytics including equity curve and performance metrics
+ */
+router.get('/analytics', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    // Import Trade model here to avoid circular dependency
+    const { Trade } = require('../models/Trade');
+
+    const wallet = await Wallet.findOne({ userId });
+    const trades = await Trade.find({ userId }).sort({ timestamp: 1 }).exec();
+
+    // Calculate total P/L from trades
+    const totalPL = trades.reduce((sum: number, trade: any) => {
+      const pl = Number(trade.profitLoss);
+      return sum + (isNaN(pl) ? 0 : pl);
+    }, 0);
+
+    // Find best and worst trades
+    const validTrades = trades.filter((t: any) => !isNaN(Number(t.profitLoss)));
+    const bestTrade = validTrades.length > 0
+      ? validTrades.reduce((best: any, trade: any) => Number(trade.profitLoss) > Number(best.profitLoss) ? trade : best)
+      : null;
+    const worstTrade = validTrades.length > 0
+      ? validTrades.reduce((worst: any, trade: any) => Number(trade.profitLoss) < Number(worst.profitLoss) ? trade : worst)
+      : null;
+
+    // Calculate equity curve (balance over time)
+    const equityCurve: { date: string; balance: number }[] = [];
+
+    // Start with initial balance
+    if (wallet && wallet.transactions.length > 0) {
+      const firstTransaction = wallet.transactions[0];
+      equityCurve.push({
+        date: new Date(firstTransaction.date).toISOString(),
+        balance: 0,
+      });
+    }
+
+    // Add wallet transactions to equity curve
+    if (wallet) {
+      let cumulativeBalance = 0;
+      for (const transaction of wallet.transactions) {
+        if (transaction.type === 'deposit') {
+          cumulativeBalance += transaction.amount;
+        } else if (transaction.type === 'withdraw') {
+          cumulativeBalance -= transaction.amount;
+        }
+        equityCurve.push({
+          date: new Date(transaction.date).toISOString(),
+          balance: cumulativeBalance,
+        });
+      }
+    }
+
+    // Add trade P/L to equity curve
+    let tradeBalance = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1].balance : 0;
+    for (const trade of trades) {
+      const pl = Number(trade.profitLoss);
+      if (!isNaN(pl)) {
+        tradeBalance += pl;
+        equityCurve.push({
+          date: new Date(trade.timestamp).toISOString(),
+          balance: tradeBalance,
+        });
+      }
+    }
+
+    res.status(200).json({
+      analytics: {
+        totalPL: Math.round(totalPL * 100) / 100,
+        currentBalance: wallet?.balance || 0,
+        bestTrade: bestTrade ? {
+          asset: bestTrade.asset,
+          profitLoss: Number(bestTrade.profitLoss),
+          date: bestTrade.timestamp,
+          mood: bestTrade.mood,
+        } : null,
+        worstTrade: worstTrade ? {
+          asset: worstTrade.asset,
+          profitLoss: Number(worstTrade.profitLoss),
+          date: worstTrade.timestamp,
+          mood: worstTrade.mood,
+        } : null,
+        equityCurve: equityCurve.slice(-50), // Last 50 data points
+        tradeCount: trades.length,
+      },
+    });
+  } catch (error) {
+    logger.error('Wallet analytics endpoint error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'An error occurred while retrieving analytics. Please try again.',
+    });
+  }
+});
+
+/**
  * POST /api/wallet/deposit
  * Mock deposit to wallet
  */

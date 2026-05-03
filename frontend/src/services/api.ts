@@ -123,6 +123,20 @@ export const walletApi = {
     return response.data;
   },
 
+  getAnalytics: async (): Promise<{
+    analytics: {
+      totalPL: number;
+      currentBalance: number;
+      bestTrade: { asset: string; profitLoss: number; date: string; mood: string } | null;
+      worstTrade: { asset: string; profitLoss: number; date: string; mood: string } | null;
+      equityCurve: { date: string; balance: number }[];
+      tradeCount: number;
+    };
+  }> => {
+    const response = await api.get('/wallet/analytics');
+    return response.data;
+  },
+
   deposit: async (amount: number, description?: string): Promise<WalletResponse> => {
     const response = await api.post<WalletResponse>('/wallet/deposit', { amount, description });
     return response.data;

@@ -332,28 +332,63 @@ export class InsightsEngine {
     const alerts: Alert[] = [];
     const validTrades = trades.filter(t => !isNaN(Number(t.profitLoss)) && isFinite(Number(t.profitLoss)));
 
-    if (validTrades.length < 5) return alerts;
+    if (validTrades.length < 3) return alerts;
 
-    // Check for revenge trading (multiple losses in short time)
-    const recentTrades = validTrades.slice(0, 5);
-    const recentLosses = recentTrades.filter(t => Number(t.profitLoss) < 0);
-    if (recentLosses.length >= 4) {
+    // Check for losing streak (3 losses in a row)
+    const recentTrades = validTrades.slice(0, 3);
+    const consecutiveLosses = recentTrades.every(t => Number(t.profitLoss) < 0);
+    if (consecutiveLosses) {
       alerts.push({
         type: 'danger',
-        message: 'Revenge trading detected: 4+ losses in your last 5 trades. Consider taking a break.',
+        message: 'You are on a losing streak (3 losses in a row). Take a break and review your strategy.',
         timestamp: new Date(),
       });
     }
 
-    // Check for overtrading (too many trades in short time)
-    const last24Hours = validTrades.filter(t => {
-      const hoursSince = (Date.now() - new Date(t.timestamp).getTime()) / (1000 * 60 * 60);
-      return hoursSince <= 24;
+    // Check for overtrading (>5 trades per day)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTrades = validTrades.filter(t => {
+      const tradeDate = new Date(t.timestamp);
+      tradeDate.setHours(0, 0, 0, 0);
+      return tradeDate.getTime() === today.getTime();
     });
-    if (last24Hours.length >= 10) {
+    if (todayTrades.length > 5) {
       alerts.push({
         type: 'warning',
-        message: 'Overtrading alert: 10+ trades in the last 24 hours. Quality over quantity!',
+        message: `Overtrading detected: ${todayTrades.length} trades today. Slow down and focus on quality.`,
+        timestamp: new Date(),
+      });
+    }
+
+    // Check mood-based performance
+    const moodPerf = this.calculateMoodPerformance(validTrades);
+    const greedyPerf = moodPerf.find(m => m.mood === Mood.GREEDY);
+    const anxiousPerf = moodPerf.find(m => m.mood === Mood.ANXIOUS);
+    
+    if (greedyPerf && greedyPerf.avgPL < 0) {
+      alerts.push({
+        type: 'warning',
+        message: 'You perform worse when greedy. Stay disciplined and stick to your plan.',
+        timestamp: new Date(),
+      });
+    }
+    
+    if (anxiousPerf && anxiousPerf.avgPL < 0) {
+      alerts.push({
+        type: 'warning',
+        message: 'You perform worse when anxious. Consider taking a break when feeling stressed.',
+        timestamp: new Date(),
+      });
+    }
+
+    // Check for revenge trading (multiple losses in short time)
+    const recentFive = validTrades.slice(0, 5);
+    const recentLosses = recentFive.filter(t => Number(t.profitLoss) < 0);
+    if (recentLosses.length >= 4) {
+      alerts.push({
+        type: 'danger',
+        message: 'Revenge trading detected: 4+ losses in your last 5 trades. Stop and reassess.',
         timestamp: new Date(),
       });
     }
@@ -364,17 +399,7 @@ export class InsightsEngine {
     if (emotionalTrades.length >= 5 && emotionalLosses.length / emotionalTrades.length > 0.7) {
       alerts.push({
         type: 'warning',
-        message: 'Emotional bias detected: 70%+ of your Greedy/Anxious trades are losses. Stay disciplined!',
-        timestamp: new Date(),
-      });
-    }
-
-    // Check current losing streak
-    const streaks = this.detectStreaks(validTrades);
-    if (streaks.current.type === 'loss' && streaks.current.count >= 3) {
-      alerts.push({
-        type: 'info',
-        message: `You're on a ${streaks.current.count}-trade losing streak. Review your strategy before continuing.`,
+        message: 'Emotional bias detected: Most of your emotional trades are losses. Trade with a clear mind.',
         timestamp: new Date(),
       });
     }
